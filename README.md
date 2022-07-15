@@ -1,6 +1,6 @@
 # A Template For Creating Repositories
 
-> This flask application ena enables an admin to register then authorizes them to create new users.
+> This flask application enables an admin to register then authorizes them to create new users.
 
 <p align="center">
   <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template-ecs/actions/workflows/feature-development-workflow.yml/badge.svg" />
