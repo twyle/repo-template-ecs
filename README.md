@@ -3,11 +3,11 @@
 > This flask application enables enables an admin to register then authorizes them to create new users.
 
 <p align="center">
-  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template/actions/workflows/feature-development-workflow.yml/badge.svg" />
-  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template/actions/workflows/development-workflow.yml/badge.svg" />
-  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template/actions/workflows/staging-workflow.yml/badge.svg" />
-  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template/actions/workflows/release-workflow.yml/badge.svg" />
-  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template/actions/workflows/production-workflow.yml/badge.svg" />
+  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template-containerized/actions/workflows/feature-development-workflow.yml/badge.svg" />
+  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template-containerized/actions/workflows/development-workflow.yml/badge.svg" />
+  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template-containerized/actions/workflows/staging-workflow.yml/badge.svg" />
+  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template-containerized/actions/workflows/release-workflow.yml/badge.svg" />
+  <img title="Bandit badge" alt="Bandit badge" src="https://github.com/twyle/repo-template-containerized/actions/workflows/production-workflow.yml/badge.svg" />
   <img title="Bandit badge" alt="Bandit badge" src="https://img.shields.io/badge/security-bandit-yellow.svg" />
   <img title="Bandit badge" alt="Bandit badge" src="https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336" />
   <img title="Bandit badge" alt="Bandit badge" src="https://img.shields.io/badge/Made%20with- Python-1f425f.svg" />
@@ -51,14 +51,14 @@ Here's a video showing how to use the application:
 ## Features
 
 This application has several features including:
- 1. Deployed to an AWS Instance using a custom domain language.
+ 1. Deployed to an AWS Instance using docker and a custom domain name.
  2. Versioned using Git and Hosted on GitHub.
  3. Auto-deployed to AWS using GitHub Actions.
- 4. Uses gunicorn as the application server and nginx as the proxy.
+ 4. Uses gunicorn as the application server and traefik as the proxy.
  5. Uses AWS SES to send emails.
- 6. Uses AWS Opensearch and Firehose for logging as filebeats.
+ 6. Uses AWS Opensearch and Firehose for logging as well as filebeats.
  7. Uses AWS Secrets manager to manage the application secrets and AWS KMS for key management.
- 8. Uses PostgreSQL for data storage.
+ 8. Uses a containerized PostgreSQL instnace for data storage.
  9. Uses JSON Web Tokens to authorize users.
  10. Uses AWS Route53 to route traffic to the application.
  11. Built using flask, flask-mail, flask-jwt
@@ -67,7 +67,7 @@ This application has several features including:
 ## Application Structure
 
 ```sh
-repo-template/
+repo-template-containerized/
 │
 └───.github/
 │     │
@@ -100,6 +100,16 @@ repo-template/
 |     |     |
 |     |     └───database-compose.yml
 |     |
+│     └───traefik/
+│     |     |
+|     |     └───Dockerfile.traefik.dev
+|     |     |
+|     |     └───Dockerfile.traefik.prod
+|     |     |
+|     |     └───traefik.dev.toml
+|     |     |
+|     |     └───traefik.prod.toml
+|     |
 |     └───web/
 |           |
 |           └───api/
@@ -126,7 +136,9 @@ repo-template/
 |
 └───.pylintrc
 |
-└───docker-compose.yml
+└───docker-compose-dev.yml
+|
+└───docker-compose-prod.yml
 |
 └───LICENSE
 |
@@ -175,13 +187,13 @@ Here is how to set up the application locally:
   1. Clone the application repo:</br>
 
       ```sh
-      git clone https://github.com/twyle/repo-template.git
+      git clone https://github.com/twyle/repo-template-ecs.git
       ```
 
   2. Navigate into the cloned repo:
 
       ```sh
-      cd repo-template
+      cd repo-template-ecs
       ```
 
   3. Create a Virtual environment:
@@ -203,6 +215,9 @@ Here is how to set up the application locally:
       make install-dev  # install the development requirements
       make install  # install the runtime requirements
       make pre-commit # initialize pre-commit
+      make initial-tag # create the initial tag
+      # Delete the pyproject.toml file
+      make init-cz # initialize commitizen
       ```
 
   6. Create the environment variables:
@@ -255,14 +270,20 @@ Here is how to set up the application locally:
 
       ```sh
       make start-db-containers
+      make create-db
+      make seed-db
       ```
 
   8. Start the application:
 
       ```sh
-      make run
+      make build
+      make run-dev
       ```
 
+  9. View the running application
+
+      Head over to flask.localhost/apidocs
 
 ## Development
 
@@ -399,95 +420,130 @@ The initial deployment describes the first dployment to the AWS EC2 instance. Th
     This involves the following steps:
 
       1. Provide an AWS EC2 instance, with latest Ubuntu version and ssh into then instance
+
+          ```sh
+          ssh -i "ec2.pem" ubuntu@ec2-xx-206-xx-100.compute-1.amazonaws.com
+          ```
+
       2. Update and upgrade the packages
-      3. Install the python package manager (python3-pip)
-      4. Install the virtual environment manager (python3-venv)
-      5. Install the PostgreSQL database
-      6. Setup the database, to disable peer authentication, to allow access from anywhere. Also set up the postgres user, with a password and create the development database.
-      7. Install nginx, enable it and start it.
-      8. Create a new user, and give them admin access.
-      9. Create an elastic IP for the EC2 instance.
+
+          ```sh
+          sudo apt update && sudo apt upgrade -y
+          ```
+
+      3. Install docker and docker compose
+
+          Follow these instaructions from Digital Ocean on [How To Install and Use Docker on Ubuntu 22.04](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04)
+
+          Then install docker compose:
+
+          ```sh
+          sudo apt install docker-compose -y
+          ```
+
+      4. Create a new user, and give them admin access and enable them to use docker.
+
+          ```sh
+          sudo adduser lyle
+          sudo usermod -aG sudo ${USER}
+          sudo usermod -aG docker ${USER}
+          ```
+
+      5. Enable ssh into the created user account
+
+          ```sh
+           sudo su - lyle
+           mkdir .ssh
+           chmod 700 .ssh
+           touch .ssh/authorized_keys
+           chmod 600 .ssh/authorized_keys
+          ```
+
+          Retrieve the public key from the private key:
+
+          ```sh
+          ssh-keygen -y -f ec2.pem
+          ```
+
+          copy and paste into the .ssh/authorized_keys file
+
+      6. Create an elastic IP for the EC2 instance.
 
  2. **Cloning the project**
 
       Clone the development branch of the project into the server. Make sure that you are logged in as the created user.
+
+      ```sh
+      ssh -i "ec2.pem" lyle@ec2-xx-206-xx-100.compute-1.amazonaws.com
+      git clone repo-template-containerized
+      ```
 
  3. **Setting up the application**
 
       This involves the following steps:
 
       1. Navigate into the cloned application folder
-      2. Create a python3 virtual environment
-      3. Update the package manager
-      4. Install the runtime dependancies
-      5. Create the project secrets
 
- 4. **Creating a service**
+        ```sh
+        cd repo-template-ec2/services/web
+        ```
 
-      Create a new service that automatically start the application when the server is booted. Enable the service and start it.
+      2. Create the project secrets
 
-      Here is the service template:
+        ```sh
+        touch services/database/.env
+        nano services/database/.env
+        ```
 
-      ```sh
-        [Unit]
-        Description=Gunicorn instance to serve the api
-        After=network.target
+        Then add the database secrets.
 
-        [Service]
-        User=lyle
-        Group=lyle
-        WorkingDirectory=/home/lyle/repo-template/services/web
-        Environment="PATH=/home/lyle/repo-template/services/web/venv/bin"
-        EnvironmentFile=/home/lyle/.env
-        ExecStart=/home/lyle/repo-template/services/web/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:5000 manage:app
+        Then create the apps secrets:
 
-        [Install]
-        WantedBy=multi-user.target
-      ```
+        ```sh
+        touch services/web/.env
+        nano services/web/.env
+        ```
 
- 5. **Setting up the application domain**
+      3. Start the database containers.
+
+        ```sh
+        sudo docker-compose -f services/database/database-compose.yml up --build -d
+        ```
+
+      4. Create the database tables
+
+        ```sh
+        cd services/web
+        sudo apt install python3-pip python3-venv -y
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+        python manage.py create_db
+        python manage.py seed_db
+
+ 4. **Setting up the application domain**
 
       Purchase a domain name then use Route53 to create a hosted zone.
 
- 6. **Setting up the application server with the domain**
+ 5. **Setting up the application server with the domain**
 
-      Update the nginx config to route traffic form port 80 to port 5000 for the gunicorn server. Here is a sample config:
+      This is done for you by traefik.
+
+ 6. **Launching the application**
+
+      Restart the application container:
 
       ```sh
-          server {
-                  listen 80 default_server;
-                  listen [::]:80 default_server;
-
-                  server_name _; # replace with specific domain name like sanjeev.com
-
-                  location / {
-                          proxy_pass http://localhost:5000;
-                          proxy_http_version 1.1;
-                          proxy_set_header X-Real-IP $remote_addr;
-                          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header Upgrade $http_upgrade;
-                          proxy_set_header Connection 'upgrade';
-                          proxy_set_header Host $http_host;
-                          proxy_set_header X-NginX-Proxy true;
-                          proxy_redirect off;
-                  }
-
-          }
+      sudo docker-compose -f docker-compose-prod.yml up -d
       ```
 
-      Use certbot to generate an SSL certficate for your domain.
-
- 7. **Launching the application**
-
-      Restart the created service.
-
-8. **Setting up Logging**
+ 7. **Setting up Logging**
 
       This involves creating a FirehoseDeliveryStream as well as AWS OpenSearch.
 
       Once the application is up and running, you can view the logs by heading over to the OpenSearch dashboard. Here is a video showing some logs:
 
-      ![](resources/videos/header.gif)
+      ![](resources/videos/logging.gif)
 
 The incremental deployment describes the process of deploying new changes to the already deployed application. It involves the following steps:
 
@@ -499,7 +555,7 @@ The incremental deployment describes the process of deploying new changes to the
 This is handled using GitHub Actions:
 
 ```sh
-DeployDev:
+  DeployDev:
     name: Deploy to Dev
     # if: github.event_name == 'pull_request'
     needs: [Test-Local]
@@ -515,87 +571,37 @@ DeployDev:
       - name: Deploy in EC2
         env:
           PRIVATE_KEY: ${{ secrets.AWS_PRIVATE_KEY  }}
-          HOST_NAME : ${{ secrets.HOST_IP  }}
+          HOST_NAME : ${{ secrets.HOST_NAME  }}
           USER_NAME : ${{ secrets.USER_NAME  }}
           USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
           APP_DIR: ${{secrets.APP_DIR}}
-          SERVICE_NAME: ${{secrets.SERVICE_NAME}}
 
         run: |
           echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
           ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOST_NAME} "
             cd ${APP_DIR} &&
             git pull &&
-            echo ${USER_PASSWORD} | sudo -S systemctl restart ${SERVICE_NAME} "
+            echo ${USER_PASSWORD} | sudo -S docker-compose -f docker-compose-prod.yml up --build -d "
 ```
 
 ## Releases
 
-## v0.3.0 (2022-07-12)
+## v0.1.0 (2022-07-14)
 
 ### Fix
 
-- checking for large file uploads.
-- provides the jwt secrets.
-- loads the env vars in config.
-- loads the env vars before app creation.
-- updated the config options.
+- fixes the release badge url.
+- updates the dockerfile path.
+- only restarts the container.
+- uses the right docker compose file.
 
 ### Feat
 
-- shows using the app.
+- auto-deploy to AWS.
+- adds the traefik config.
+- creates the initial project layout.
 
-## v0.2.0 (2022-07-12)
-
-### Fix
-
-- restores the old animation.
-- updates the workflow badges.
-
-### Feat
-
-- adds the app animation.
-- adds the workflow badges.
-
-## v0.1.0 (2022-07-12)
-
-### Feat
-
-- adds the project layout.
-
-## v0.0.1 (2022-07-12)
-
-### Feat
-
-- adds the makefile.
-- creates the deployment instructions.
-- creates the deployment instructions.
-- creates the deployment instructions.
-- creates the deployment instructions.
-- creates the deployment instructions.
-- creates the deployment instructions.
-- creates the deployment instructions.
-- adds the application routes.
-- adds the development workflow.
-- shows how to install the application.
-- shows how to install the application.
-- shows how to develop the project locally.
-- adds the application structure.
-- creates the initial layout.
-- adds the video showing app usage.
-- shows how to use the application.
-- updates the project description.
-- resizes the images.
-- adds the header image.
-- adds the header image.
-- Creates the section headers.
-
-### Fix
-
-- uses gif.
-- using mp4
-- fixes the video tag.
-
+## v0.0.1 (2022-07-14)
 
 ## Contribution
 

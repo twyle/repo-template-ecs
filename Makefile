@@ -40,3 +40,9 @@ seed-db:
 test-local:
 	@curl localhost:5000/
 	@curl localhost:5000/users
+
+build:
+	@cd services/web && docker build -t repo-template-ecs:latest -f Dockerfile.dev .
+
+run-dev:
+	@docker run -p5000:5000 repo-template-ecs:latest
