@@ -525,6 +525,22 @@ Here is the buildspec file:
         files: imagedefinitions.json
 ```
 
+ 12. **Create a hosted zone using Route53**
+
+      Purchase a domain name from a service such as namecheap, then use that domain name to create a hosted zone on AWS using Route53.
+
+ 13. **Create an SSL Certificate for your domain**
+
+      Use AWS Certificate manager to generate an SSL certificate for your newly created domain.
+
+ 14. **Create a record that points your application load balancer to this domain**
+
+      To use this domain with your application, you need to:
+
+      1. Set up a static IP for your application load balancer using the AWS static IP service.
+      2. Create an A record that points to that static IP
+      3. Create a listener on your ALB for HTTPS traffic.
+
 ## Releases
 
 ## v0.1.0 (2022-07-14)
