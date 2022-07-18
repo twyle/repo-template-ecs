@@ -11,7 +11,7 @@ from .blueprints.default.views import default
 from .blueprints.extensions import app_logger, db, jwt, swagger
 from .error_handlers import handle_bad_request
 from .extensions import migrate
-from .helpers import are_environment_variables_set, set_flask_environment
+from .helpers import are_environment_variables_set, create_db_tables, set_flask_environment
 
 if not are_environment_variables_set():
     msg = 'Unable to set Environment variables. Application existing...'
@@ -46,6 +46,9 @@ def create_app(script_info=None):   # pylint: disable=W0613
 
     app.register_error_handler(400, handle_bad_request)
     app_logger.info('Successfully registered te 400 error handler.')
+
+    # Create the tables
+    create_db_tables(app, db)
 
     # shell context for flask cli
     app.shell_context_processor({'app': app, 'db': db})

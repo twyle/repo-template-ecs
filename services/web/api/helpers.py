@@ -2,8 +2,10 @@
 """This module has methods that are used in the other modules in this package."""
 import os
 
+import sqlalchemy
 from sqlalchemy_utils import database_exists
 
+from .blueprints.default.models import User
 from .blueprints.extensions import app_logger
 
 
@@ -256,3 +258,29 @@ def are_environment_variables_set() -> bool:  # pylint: disable=R0912,R0915,R091
         return False
 
     return True
+
+
+def seed_db(db):
+    """Create the initial records."""
+    db.session.add(User(
+        email='lyle@notreal.com',
+    ))
+    db.session.add(User(
+        email='michael@notreal.com',
+    ))
+    db.session.commit()
+
+
+def create_db_tables(app, db):
+    """Create the database tables if they do not exist."""
+    with app.app_context():
+        try:
+            User.query.all()
+            app_logger.info('Database tables already exist...')
+        except sqlalchemy.exc.ProgrammingError:
+            app_logger.info('Creating the database tables...')
+            db.create_all()
+            db.session.commit()
+            app_logger.info('Creating the initial records...')
+            seed_db(db)
+            app_logger.info('Created the database and initial records...')

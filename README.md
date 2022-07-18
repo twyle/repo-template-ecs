@@ -51,18 +51,20 @@ Here's a video showing how to use the application:
 ## Features
 
 This application has several features including:
- 1. Deployed to an AWS Instance using docker and a custom domain name.
- 2. Versioned using Git and Hosted on GitHub.
- 3. Auto-deployed to AWS using GitHub Actions.
- 4. Uses gunicorn as the application server and traefik as the proxy.
- 5. Uses AWS SES to send emails.
- 6. Uses AWS Opensearch and Firehose for logging as well as filebeats.
- 7. Uses AWS Secrets manager to manage the application secrets and AWS KMS for key management.
- 8. Uses a containerized PostgreSQL instnace for data storage.
- 9. Uses JSON Web Tokens to authorize users.
- 10. Uses AWS Route53 to route traffic to the application.
- 11. Built using flask, flask-mail, flask-jwt
- 12. Documented using swagger
+ 1. Deployed to an AWS ECS using Fargate with a custom domain name.
+ 2. Versioned using Git and Hosted on GitHub and AWS CodeCommit.
+ 3. Auto-deployed to AWS using AWS CodePipeline.
+ 4. Uses gunicorn as the application server.
+ 5. Uses AWS ECR to host the container image.
+ 6. Uses an Application Load Balancer with an SSL certifivcate from AWS certificate manager.
+ 7. Uses AWS SES to send emails.
+ 8. Uses AWS Opensearch and Firehose for logging as well as filebeats.
+ 9. Uses AWS Secrets manager to manage the application secrets and AWS KMS for key management.
+ 10. Uses a containerized PostgreSQL instnace for data storage.
+ 11. Uses JSON Web Tokens to authorize users.
+ 12. Uses AWS Route53 to route traffic to the application.
+ 13. Built using flask, flask-mail, flask-jwt
+ 14. Documented using swagger
 
 ## Application Structure
 
@@ -283,7 +285,7 @@ Here is how to set up the application locally:
 
   9. View the running application
 
-      Head over to flask.localhost/apidocs
+      Head over to http://0.0.0.0:5000/apidocs
 
 ## Development
 
@@ -415,131 +417,73 @@ The deployemt process for this application can be divided into two groups:
 
 The initial deployment describes the first dployment to the AWS EC2 instance. The process involves the following steps:
 
- 1. **Setting up an AWS EC2 instance**
+ 1. **Set up a container registry on ECR**
 
-    This involves the following steps:
+      Head on over to AWS and set up a container registry using ECR.
 
-      1. Provide an AWS EC2 instance, with latest Ubuntu version and ssh into then instance
+ 2. **Push the python container to ECR**
 
-          ```sh
-          ssh -i "ec2.pem" ubuntu@ec2-xx-206-xx-100.compute-1.amazonaws.com
-          ```
+      To push the created container image to ECR, you need to tag it, then sign into your account then push it:
 
-      2. Update and upgrade the packages
-
-          ```sh
-          sudo apt update && sudo apt upgrade -y
-          ```
-
-      3. Install docker and docker compose
-
-          Follow these instaructions from Digital Ocean on [How To Install and Use Docker on Ubuntu 22.04](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04)
-
-          Then install docker compose:
-
-          ```sh
-          sudo apt install docker-compose -y
-          ```
-
-      4. Create a new user, and give them admin access and enable them to use docker.
-
-          ```sh
-          sudo adduser lyle
-          sudo usermod -aG sudo ${USER}
-          sudo usermod -aG docker ${USER}
-          ```
-
-      5. Enable ssh into the created user account
-
-          ```sh
-           sudo su - lyle
-           mkdir .ssh
-           chmod 700 .ssh
-           touch .ssh/authorized_keys
-           chmod 600 .ssh/authorized_keys
-          ```
-
-          Retrieve the public key from the private key:
-
-          ```sh
-          ssh-keygen -y -f ec2.pem
-          ```
-
-          copy and paste into the .ssh/authorized_keys file
-
-      6. Create an elastic IP for the EC2 instance.
-
- 2. **Cloning the project**
-
-      Clone the development branch of the project into the server. Make sure that you are logged in as the created user.
-
-      ```sh
-      ssh -i "ec2.pem" lyle@ec2-xx-206-xx-100.compute-1.amazonaws.com
-      git clone repo-template-containerized
-      ```
-
- 3. **Setting up the application**
-
-      This involves the following steps:
-
-      1. Navigate into the cloned application folder
+      1. Log into ECR
 
         ```sh
-        cd repo-template-ec2/services/web
+        aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/xxxxx
         ```
 
-      2. Create the project secrets
+      2. Build the image
 
         ```sh
-        touch services/database/.env
-        nano services/database/.env
+        make build
         ```
 
-        Then add the database secrets.
-
-        Then create the apps secrets:
+      3. Tag the image
 
         ```sh
-        touch services/web/.env
-        nano services/web/.env
+        docker tag repo-template-ecs:latest public.ecr.aws/xxxxxxxx/repo-template-ecs:latest
         ```
 
-      3. Start the database containers.
+      3. Pushto ECR registry
 
         ```sh
-        sudo docker-compose -f services/database/database-compose.yml up --build -d
+        docker push public.ecr.aws/xxxxxxxxx/repo-template-ecs:latest
         ```
 
-      4. Create the database tables
+ 3. **Set up an ECS Cluster using Fargate**
 
-        ```sh
-        cd services/web
-        sudo apt install python3-pip python3-venv -y
-        python3 -m venv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-        python manage.py create_db
-        python manage.py seed_db
+      Set up an ECS cluster that uses Fargate
 
- 4. **Setting up the application domain**
+ 4. **Set up a Task Definition for PostgreSQL database**
 
-      Purchase a domain name then use Route53 to create a hosted zone.
+      Set up a task for PostgreSQL and make sure to note the database secrets such as the database name, port, user e.t.c. You can create a custom image and upload it to an ECR repo or use the image that comes from docker. You can use AWS S3 to store the .env file with the secrets.
 
- 5. **Setting up the application server with the domain**
+ 5. **Create a Service for the Postgres Database Task**
 
-      This is done for you by traefik.
+      This service ensures that we always have a task running and never lose connection to our task. Make sure to enable service detection so that the flask app easily connects t this service.
 
- 6. **Launching the application**
+ 6. **Create a target group.**
 
-      Restart the application container:
+      Create a target group that wil be use by the load balancer to route the traffic to our python service.
 
-      ```sh
-      sudo docker-compose -f docker-compose-prod.yml up -d
-      ```
+ 7. **Set up an Application Load balancer**
 
- 7. **Setting up Logging**
+      The load balancer will direct the HTTP and HTTPS traffic to our Python Service through the created target group.
 
-      This involves creating a FirehoseDeliveryStream as well as AWS OpenSearch.
+ 8. **Create the application Task Definition**
+
+      Use the docker image that you pushed to ECR to create th task definition. You can also upload the .env file to an S3 bucket and use i within your task definition.
+
+ 9. **Create the application Service**
+
+      Use the task defination above to create a service fr the flask app.
+
+ 10. **Create the application Service**
+
+      Create the deployment pipeline. This involves setting up a build project that buils the image and pushes it to the ecr registry and also a deployment job that deploys the latest changes.
+
+  11. **Setting up Logging**
+
+      This involves creating a FirehoseDeliveryStream as well as AWS OpenSearch domain.
 
       Once the application is up and running, you can view the logs by heading over to the OpenSearch dashboard. Here is a video showing some logs:
 
@@ -547,41 +491,38 @@ The initial deployment describes the first dployment to the AWS EC2 instance. Th
 
 The incremental deployment describes the process of deploying new changes to the already deployed application. It involves the following steps:
 
- 1. Tunelling into the deployment server
- 2. Pulling the latest changes
- 3. Running database migrations
- 4. Restarting the application
+ 1. Merging the new feature code into the development branch.
+ 2. This triggers the AWS code pipeline
+ 3. Codebuild builds the image and pushes it to the ecr repo thatt we created.
+ 4. Codedeploy pulls the latest image from ecr and gradually updates each task in the serice we created.
 
-This is handled using GitHub Actions:
+Here is the buildspec file:
 
 ```sh
-  DeployDev:
-    name: Deploy to Dev
-    # if: github.event_name == 'pull_request'
-    needs: [Test-Local]
-    runs-on: ubuntu-latest
-    environment:
-      name: Development
+    version: 0.2
 
-    steps:
+    phases:
+      pre_build:
+        commands:
+          - echo Logging in to Amazon ECR...
+          - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
-      - name: Deploy
-        run: echo I am deploying the api to AWS
+      build:
+        commands:
+          - echo Build started on `date`
+          - echo Building the Docker image...
+          - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+          - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      post_build:
+        commands:
+          - echo Build completed on `date`
+          - echo Pushing the Docker image...
+          - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+          - printf '[{"name":"ecs-container","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json
+          - cat imagedefinitions.json
 
-      - name: Deploy in EC2
-        env:
-          PRIVATE_KEY: ${{ secrets.AWS_PRIVATE_KEY  }}
-          HOST_NAME : ${{ secrets.HOST_NAME  }}
-          USER_NAME : ${{ secrets.USER_NAME  }}
-          USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
-          APP_DIR: ${{secrets.APP_DIR}}
-
-        run: |
-          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOST_NAME} "
-            cd ${APP_DIR} &&
-            git pull &&
-            echo ${USER_PASSWORD} | sudo -S docker-compose -f docker-compose-prod.yml up --build -d "
+    artifacts:
+        files: imagedefinitions.json
 ```
 
 ## Releases

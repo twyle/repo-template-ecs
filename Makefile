@@ -1,3 +1,18 @@
+# The binary to build (just the basename).
+PROJECT := repo-template-ecs
+
+# Where to push the docker image.
+REGISTRY ?= docker.io/lyleokoth/repo-template-ecs
+
+IMAGE := $(REGISTRY)/$(PROJECT)
+
+# This version-strategy uses git tags to set the version string
+TAG=$(git describe --tags --abbrev=0)
+
+get-tag:
+	@echo "$(IMAGE)"
+	@echo ${TAG}
+
 update:
 	@pip install --upgrade pip
 
@@ -45,4 +60,4 @@ build:
 	@cd services/web && docker build -t repo-template-ecs:latest -f Dockerfile.dev .
 
 run-dev:
-	@docker run -p5000:5000 repo-template-ecs:latest
+	@docker run -p5000:5000 --env-file ./services/web/.env repo-template-ecs:latest
