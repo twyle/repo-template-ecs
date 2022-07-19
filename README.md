@@ -1,4 +1,4 @@
-# A Template For Creating Repositories
+# A Template For Deploying a Flask app to AWS ECS.
 
 > This flask application enables an admin to register then authorizes them to create new users.
 
